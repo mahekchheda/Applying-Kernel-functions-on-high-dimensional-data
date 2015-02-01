@@ -1,0 +1,107 @@
+source("ex-1.R")
+
+confusion <- function(a,b)
+{
+	foo <- vector(mode="list", length=4)
+	names(foo) <- c("TP", "FN", "FP","TN")
+	for (i in (1:4))
+		foo[[i]] <- 0
+	for( i in (1:length(a)))
+	{
+		if(a[i]==1 && b[i]==1)
+			foo[[1]] = foo[[1]]+1
+		else if(a[i]==1 && b[i]==-1)
+			foo[[2]] = foo[[2]]+1
+		else if(a[i]==-1 && b[i]==1)
+			foo[[3]] = foo[[3]]+1
+		else
+			foo[[4]] = foo[[4]]+1
+	}
+	return(foo)
+}
+
+performance_metric <- function(mat)
+{
+	foo <- vector(mode="list", length=10)
+	names(foo) <- c("Accuracy", "Error_Rate", "TPR","TNR","FPR","FNR","Precision-1","Precision-2","F-measure-1","F-measure-2")
+	foo[[1]] <- (mat$TP + mat$TN) / 300
+	foo[[2]] <- (mat$FN + mat$FP) / 300
+	foo[[3]] <- (mat$TP) / (mat$TP + mat$FN)
+	foo[[4]] <- (mat$TN) / (mat$FP + mat$TN)
+ 	foo[[5]] <- (mat$FP) / (mat$FP + mat$TN)
+	foo[[6]] <- (mat$FN) / (mat$TP + mat$FN)
+	foo[[7]] <- mat$TP / (mat$TP + mat$FP)
+	foo[[8]] <- mat$TN / (mat$TN + mat$FN)
+	foo[[9]] <- (2 * foo[[7]] * foo[[3]]) / (foo[[7]]+foo[[3]])
+	foo[[10]]<- (2 * foo[[8]] * foo[[4]]) / (foo[[8]]+foo[[4]])
+	return(foo)
+}
+actual <- list()
+#Actual class of points
+actual <- matrix(c(rep(1,150),rep(-1,150)))
+
+#Metrics for K-means clustering.
+kc <- kmeans(bad_kmeans,3)
+predicted <- kc$cluster
+
+conf_kmean <- confusion(actual,predicted)
+metric_kmean <- performance_metric(conf_kmean)
+print(metric_kmean)
+
+
+#Metrics for SVM
+library(e1071)
+library(rpart)
+
+## Prepare a training and a test set ##
+ntrain <- round(300*0.8) # number of training examples
+tindex <- sample(300,ntrain) # indices of training samples
+xtrain <- bad_svm[tindex,]
+xtest <- bad_svm[-tindex,]
+ytrain <- actual[tindex]
+ytest <- actual[-tindex]
+istrain=rep(0,300)
+istrain[tindex]=1
+
+svm.model <- svm(xtrain,ytrain, type = "C-classification")
+print(svm.model)
+svm.pred <- predict(svm.model,xtest)
+x <- table(ytest,svm.pred)
+print("Predicting labels on test")
+print(x)
+
+# Compute at the prediction scores
+ypredscore = predict(svm.model,xtest,type="decision")
+
+y <- table(ypredscore > 0,svm.pred)
+print("Check that the predicted labels are the signs of the scores")
+print(y)
+
+require(ROCR)
+pred <- prediction(ypredscore,ytest)
+
+# Plot ROC curve
+perf <- performance(pred, measure = "tpr", x.measure = "fpr")
+x11()
+plot(perf,main="ROC curve for BAD SVM")
+
+# Plot precision/recall curve
+perf <- performance(pred, measure = "prec", x.measure = "rec")
+x11()
+plot(perf,main="Precision/Recall curve for BAD SVM")
+
+# Plot accuracy as function of threshold
+perf <- performance(pred, measure = "acc")
+plot(perf,main = "Accuracy as function of Threshold for BAD SVM")
+
+
+# Metrics for PCA
+X <- bad_pca[,1:2]
+pca = princomp (X, center=TRUE);
+loadings(pca);      # matrix of eigenvectors
+summary (pca); # check proportion of variance
+P=pca$scores;     # projection of X onto eigenvectors
+x11()
+plot (P[ ,1], P[ ,2]);
+points (P [1:150, 1], P[1:150,2], col="red");
+points (P [151:300, 1], P[151:300,2], col="blue");
